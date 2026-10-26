@@ -22,7 +22,7 @@ def horizontal_interp(source,target,method='bilinear'):
 def vertical_interp(source,source_plevs,target_plevs):
     """ interpolate with logP using a cubic spline"""
     source['lev'] = source_plevs
-    out = source.interp(lev=target_plevs[1:],method='linear')
+    out = source.interp(lev=target_plevs,method='linear')
     return out
 
 def get_fv3_grid(filename):
@@ -103,6 +103,7 @@ def main():
     parser.add_argument('-c', '--core_file', help='fv3 core tile file: example gfs_ctrl.nc', default=None, required=True)
     parser.add_argument('-t', '--tracer_file', help='fv3 tile tracer file: example gfs_data.tile1.nc', default=None, required=True)
     parser.add_argument('-r', '--resolution', help='fv3 grid resolution: example C384', default=None, required=True)
+    parser.add_argument('-utc', '--utc', help='utc for initial condition', default=0, type=int,required=False)
 #     parser.add_argument('-g', '--grid_spec', help ='ufs grid_spec file: example grid_spec.tile1.nc', default=None, required=True) 
     parser.add_argument('-a', '--aerosol', help='True: aerosol file.... False: Gas', default=True, required=False)
     args = parser.parse_args()
@@ -110,15 +111,17 @@ def main():
     merra_file = args.merra_file
     core_file = args.core_file
     tracer_file = args.tracer_file
+    index_t=int(args.utc/3) 
+    print('using time index ',index_t,'for merra2 file')
 #    grid_file = args.grid_spec
 #    grid = args.grid_spec
 
     # open files
-    merra = open_dataset(merra_file).isel(time=0) # only get the first time stamp
+    merra = open_dataset(merra_file).isel(time=index_t)
     core = open_dataset(core_file)
     tracer = open_dataset(tracer_file)
 
-    tile = int(tracer_file.split('.')[1].strip('tile'))
+    tile = int(tracer_file.split('.')[-2].strip('tile'))
 #     grid = get_fv3_grid(grid_file) # open_dataset(grid)
     grid = fg.get_fv3_grid(res=args.resolution,tile=tile)
 
@@ -155,8 +158,9 @@ def main():
     # interpolate horizontally 
     hinterped = horizontal_interp(merra,grid,method='bilinear')
     
-    # vertically interpolate 
-    hvinterped = vertical_interp(hinterped, np.log(merra_press), np.log(fv3_press))
+    # vertically interpolate
+#    print('merra_press min=',merra_press.min(),' fv3_press=',fv3_press[1:].min(),fv3_press.shape )
+    hvinterped = vertical_interp(hinterped, np.log(merra_press), np.log(fv3_press[1:]))
     
     # construct 3d pressure
     p = np.ones(tracer.o3mr.shape)
